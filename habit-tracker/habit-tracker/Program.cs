@@ -12,6 +12,8 @@ namespace habit_tracker
             {
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
+                //tableCmd.CommandText = @"DROP TABLE IF EXISTS drinking_water";
+                //tableCmd.ExecuteNonQuery();
                 tableCmd.CommandText =
                     @"CREATE TABLE IF NOT EXISTS drinking_water (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +49,7 @@ namespace habit_tracker
                     case "0":
                         Console.WriteLine("\nGoodbye!\n");
                         closeApp = true;
+                        Environment.Exit(0);
                         break;
                     case "1":
                         GetAllRecords();
@@ -54,12 +57,12 @@ namespace habit_tracker
                     case "2":
                         Insert();
                         break;
-                    //case "3":
-                    //    Delete();
-                    //    break;
-                    //case "4":
-                    //    Update();
-                    //    break;
+                    case "3":
+                        Delete();
+                        break;
+                    case "4":
+                        Update();
+                        break;
                     default:
                         Console.WriteLine("\nInvalid command. Please try again.\n");
                         break;
@@ -70,7 +73,7 @@ namespace habit_tracker
         private static void Insert()
         {
             string date = GetDateInput();
-            int quantity = GetNumberInput();
+            int quantity = GetNumberInput("\n\nPlease insert the number of glasses or another measure of your choice (no decimals allowed). Type 0 to return to the main menu\n\n");
 
             using (var connection = new SQLiteConnection(connectionString))
             {
@@ -113,7 +116,7 @@ namespace habit_tracker
                     }
                 } else
                 {
-                    Console.WriteLine("Table is empty");
+                    Console.WriteLine("No data to display");
                 }
 
                 connection.Close();
@@ -129,6 +132,65 @@ namespace habit_tracker
             }
         }
 
+        private static void Delete()
+        {
+            Console.Clear();
+            GetAllRecords();
+            var recordId = GetNumberInput("\n\nPlease type the ID of the record you want to delete, or type 0 to return to the main menu.\n\n");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                var tableCmd = connection.CreateCommand();
+
+                tableCmd.CommandText = $"DELETE from drinking_water WHERE Id = '{recordId}'"; 
+
+                int rowCount = tableCmd.ExecuteNonQuery();
+                
+                if (rowCount == 0)
+                {
+                    Console.WriteLine($"\n\nRecord with ID {recordId} doesn't exist.\n\n");
+                    Delete();
+                }
+
+                Console.WriteLine($"\n\nRecord with ID {recordId} was deleted. \n\n");
+                connection.Close();
+            }
+        }
+
+        internal static void Update()
+        {
+            Console.Clear();
+            GetAllRecords();
+            var recordId = GetNumberInput("\n\nPlease type the ID of the record you want to update, or type 0 to return to the main menu.\n\n");
+
+            using (var connection = new SQLiteConnection(connectionString))
+            {
+                connection.Open();
+                var checkCmd = connection.CreateCommand();
+                checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = {recordId})";
+                int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                if (checkQuery == 0)
+                {
+                    Console.WriteLine($"\n\nRecord with ID {recordId} doesn't exist.\n\n");
+                    connection.Close();
+                    Update();
+                }
+
+                string date = GetDateInput();
+
+                int quantity = GetNumberInput("\n\nPlease insert number of glasses or other measure of your choice (no decimals allowed)\n\n");
+
+                var tableCmd = connection.CreateCommand();
+                tableCmd.CommandText = $"UPDATE drinking_water SET date = '{date}', quantity = {quantity} WHERE Id = {recordId}";
+
+                tableCmd.ExecuteNonQuery();
+
+                connection.Close();
+            }
+        }
+
         internal static string GetDateInput()
         {
             Console.WriteLine("\n\nPlease insert the date: (Format: mm-dd-yy). Type 0 to return to the main menu\n\n");
@@ -136,15 +198,27 @@ namespace habit_tracker
 
             if (dateInput == "0") GetUserInput();
 
+            while (!DateTime.TryParseExact(dateInput, "dd-MM-yy", new CultureInfo("en-US"), DateTimeStyles.None, out _))
+            {
+                Console.WriteLine("\n\nInvalid date. (Format: dd-mm-yy). Type 0 to return to main manu or try again:\n\n");
+                dateInput = Console.ReadLine();
+            }
+
             return dateInput;
         }
 
-        internal static int GetNumberInput()
+        internal static int GetNumberInput(string message)
         {
-            Console.WriteLine("\n\nPlease insert the number of glasses or another measure of your choice (no decimals allowed). Type 0 to return to the main menu\n\n");
+            Console.WriteLine(message);
             string numInput = Console.ReadLine();
 
             if (numInput == "0") GetUserInput();
+
+            while (!Int32.TryParse(numInput, out _) || Convert.ToInt32(numInput) < 0)
+            {
+                Console.WriteLine("\n\nInvalid number. Try again.\n\n");
+                numInput = Console.ReadLine();
+            }
 
             int finalInput = Convert.ToInt32(numInput);
 
